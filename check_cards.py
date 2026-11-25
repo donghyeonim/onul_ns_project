@@ -13,6 +13,7 @@ from datetime import date, datetime
 LIMITS = {"title": 20, "what": 24, "why": 36, "next": 24, "keyword": 16, "outro": 28}
 COPY_LIMIT = 85      # 기사 문장과 이 점수(0~100) 이상 비슷하면 베낀 것으로 본다
 MAX_AGE_DAYS = 2     # 카드 날짜보다 이만큼 넘게 오래된 기사는 오래된 기사로 본다
+N_ISSUES = 5         # 매일 뉴스 개수
 
 errors, warns = [], []
 
@@ -55,8 +56,8 @@ def article_date(s):
 
 def check_text(d):
     kws = d.get("keywords", [])
-    if len(kws) != 3:
-        errors.append(f"표지 키워드: {len(kws)}개 (3개여야 해요)")
+    if len(kws) != N_ISSUES:
+        errors.append(f"표지 키워드: {len(kws)}개 ({N_ISSUES}개여야 해요)")
     for i, k in enumerate(kws, 1):
         length(f"표지 키워드 {i}", k, LIMITS["keyword"])
     length("마무리 한 줄", d.get("outro_line", ""), LIMITS["outro"])
@@ -66,8 +67,8 @@ def check_text(d):
         errors.append(f"date 형식이 달라요 (예: 2026년 11월 25일 (수)) → \"{d.get('date')}\"")
 
     issues = d.get("issues", [])
-    if len(issues) != 3:
-        errors.append(f"이슈: {len(issues)}개 (3개여야 해요)")
+    if len(issues) != N_ISSUES:
+        errors.append(f"이슈: {len(issues)}개 ({N_ISSUES}개여야 해요)")
     for i, it in enumerate(issues, 1):
         c = f"이슈 {i}"
         length(f"{c} 제목", it.get("title", ""), LIMITS["title"])
