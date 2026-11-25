@@ -16,7 +16,7 @@ MAX_AGE_DAYS = 2     # 카드 날짜보다 이만큼 넘게 오래된 기사는 
 N_ISSUES = 5         # 매일 뉴스 개수
 
 # AI 말투 (CLAUDE.md 'AI 말투 빼기', backnotprop/pstack unslop 스킬(MIT)의 한국어판)
-AI_PHRASES = ["주목할 만", "눈길을 끈", "관심이 쏠", "기대를 모", "시사하는 바", "의미가 크", "중요한 역할",
+AI_PHRASES = ["주목할 만", "눈길을 끈", "눈길을 끌", "이목이 집중", "관심이 쏠", "기대를 모", "시사하는 바", "의미가 크", "중요한 역할",
               "결론적으로", "새로운 국면", "파장이 예상", "귀추가 주목", "논란이 됐다", "논란이 되고",
               "앞으로가 기대", "지켜볼 필요", "뿐만 아니라", "에 따르면 관계자"]
 HEDGES = ["예정", "알려져", "전망", "보인다", "가능성", "것으로 보"]
@@ -111,6 +111,9 @@ def ai_style(where, text):
     for ph in AI_PHRASES:
         if ph in text:
             errors.append(f"{where}: AI 말투 \"{ph}\" → 실제 사실·숫자·일정으로 바꿔 써요")
+    vague = [w for w in ("크게", "매우", "상당히", "대폭", "급격히") if w in text]
+    if vague:
+        warns.append(f"{where}: 꾸밈말 {', '.join(vague)} → 가능하면 숫자로 ({text.replace('**', '')})")
     if re.search("[—–]", text):
         errors.append(f"{where}: 줄표(—)는 쓰지 않아요. 쉼표나 마침표로")
     if re.search("[\U0001F300-\U0001FAFF\u2600-\u27BF]", text):
