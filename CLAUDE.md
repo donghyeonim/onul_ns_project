@@ -103,19 +103,19 @@
 - 마지막 줄: "업로드 전에 한 번 더 훑어봐 주세요. 사진 7장을 순서대로 골라 올리면 돼요."
 
 ## 6. 보관함에 올리기 (예약 작업은 반드시)
-사용자는 결과를 보관함 페이지 https://claude.ai/artifact/85ib9KNyPjXsJDMNxrU7NL 에서 날짜별로 확인한다. 전달을 마친 뒤 같은 내용을 여기에 올린다.
-1. `Artifact` 도구 `action: "read"`로 위 주소를 한 번 읽는다(그래야 올리기가 허락된다).
-2. 카드 7장을 올린다: `Artifact` 도구 publish, `url`: 위 주소, `asset: true`, `file_paths`: [card_01.jpg … card_07.jpg의 절대 경로]. 결과의 각 `id`와 `url`(`/_blob/…`)을 순서대로 적어 둔다.
-3. `ArtifactData` 도구 `action: "set"`, `url`: 위 주소, `collection: "days"`, `doc_id`: 오늘 날짜(`2026-11-26` 형식)로 아래 문서를 쓴다. 같은 날짜 문서가 이미 있으면 먼저 `get`으로 읽고 그 `version`을 `if_version`으로 넣는다.
-   ```json
-   {"weekday": "목", "status": "ok", "made_at": "완료 시각(ISO, UTC)", "checker": "check_cards.py 최종 결과 한 줄(예: 통과 (주의 2개))",
-    "cards": [{"id": "…", "url": "/_blob/…"}, …7개],
-    "caption": "[캡션] 전문(그대로 복사할 글)",
-    "why": [{"n": 1, "title": "카드 제목", "kind": "중요 또는 흥미", "reason": "고른 이유 한 줄"}, …5개],
-    "factcheck": "[사실 확인 결과] 전문. 기사 링크는 https 주소 그대로, 줄바꿈으로 구분"}
+보관함은 이 저장소의 `archive/` 폴더다(`archive/README.md`가 날짜별 목차). 전달을 마친 뒤 그날 결과를 여기에 올린다.
+1. `cards.json`에 `"why"`([{"kind": "중요" 또는 "흥미", "reason": "고른 이유 한 줄"}, …이슈 순서대로])와 `"factcheck"`([사실 확인 결과] 전문, 기사 링크는 https 주소 그대로)를 넣는다. `"caption"`은 이미 있다.
+2. `python3 archive_day.py cards.json out/날짜` 를 실행한다 → `archive/날짜/`에 카드와 README.md가 생기고 목차에 한 줄 추가된다.
+3. 올린다:
    ```
-4. **실패한 날도 기록한다.** 저장소를 못 받았거나 카드를 못 만들었으면 `"status": "failed"`, `"error": "어느 단계에서 무슨 오류가 났는지"`만 넣어 같은 방식으로 쓴다(`cards`는 빈 배열).
-5. 보관함에 올리지 못해도 카드 전달은 그대로 하고, 마지막에 "보관함 올리기 실패: 이유"를 한 줄 덧붙인다.
+   git add archive/
+   git commit -m "보관함: 날짜 카드뉴스"
+   git pull --rebase origin main
+   git push origin HEAD:main
+   ```
+   올리는 것은 `archive/`뿐이다. 다른 파일(코드, CLAUDE.md, cards.json, out/)은 commit하지 않는다.
+4. **실패한 날도 기록한다.** 카드를 못 만들었으면 `python3 archive_day.py --failed 날짜 "어느 단계에서 무슨 오류"` 후 같은 방법으로 올린다.
+5. 올리기에 실패해도 카드 전달은 그대로 하고, 마지막 메시지에 "보관함 올리기 실패: 이유"를 한 줄 덧붙인다.
 
 ## 디자인 요약 (참고)
 - 1080×1350(4:5) 세로 카드, 아이보리 종이 배경, 진한 남색 글자, 명조체 제목

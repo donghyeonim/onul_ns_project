@@ -186,7 +186,7 @@ def check_glyphs(d):
     for f in ("NotoSansKR-Bold.otf", "NotoSansKR-Medium.otf", "NotoSerifKR-Bold.otf"):
         cm = set(TTFont(os.path.join(fd, f)).getBestCmap())
         have = cm if have is None else have & cm
-    on_card = {k: v for k, v in d.items() if k != "caption"}
+    on_card = {k: v for k, v in d.items() if k not in ("caption", "why", "factcheck")}
     bad = sorted({ch for t in walk_strings(on_card) for ch in t.replace("**", "") if ord(ch) not in have and not ch.isspace()})
     for ch in bad:
         hint = f" → \"{HANJA_HINT[ch]}\"처럼 한글로" if ch in HANJA_HINT else " → 다른 글자로 바꿔요"
