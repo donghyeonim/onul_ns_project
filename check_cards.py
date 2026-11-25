@@ -13,7 +13,8 @@ from datetime import date, datetime
 LIMITS = {"title": 20, "what": 24, "why": 36, "next": 24, "keyword": 16, "outro": 28}
 COPY_LIMIT = 85      # 기사 문장과 이 점수(0~100) 이상 비슷하면 베낀 것으로 본다
 MAX_AGE_DAYS = 2     # 카드 날짜보다 이만큼 넘게 오래된 기사는 오래된 기사로 본다
-N_ISSUES = 5         # 매일 뉴스 개수
+N_ISSUES = 5         # 매일 뉴스 개수 (확인된 뉴스가 모자라면 MIN_ISSUES까지 줄여도 됨)
+MIN_ISSUES = 3
 
 # AI 말투 (CLAUDE.md 'AI 말투 빼기', backnotprop/pstack unslop 스킬(MIT)의 한국어판)
 AI_PHRASES = ["주목할 만", "눈길을 끈", "눈길을 끌", "이목이 집중", "관심이 쏠", "기대를 모", "시사하는 바", "의미가 크", "중요한 역할",
@@ -62,8 +63,8 @@ def article_date(s):
 
 def check_text(d):
     kws = d.get("keywords", [])
-    if len(kws) != N_ISSUES:
-        errors.append(f"표지 키워드: {len(kws)}개 ({N_ISSUES}개여야 해요)")
+    if len(kws) != len(d.get("issues", [])):
+        errors.append(f"표지 키워드: {len(kws)}개 (뉴스 개수와 같아야 해요)")
     for i, k in enumerate(kws, 1):
         length(f"표지 키워드 {i}", k, LIMITS["keyword"])
     length("마무리 한 줄", d.get("outro_line", ""), LIMITS["outro"])
@@ -73,8 +74,10 @@ def check_text(d):
         errors.append(f"date 형식이 달라요 (예: 2026년 11월 25일 (수)) → \"{d.get('date')}\"")
 
     issues = d.get("issues", [])
-    if len(issues) != N_ISSUES:
-        errors.append(f"이슈: {len(issues)}개 ({N_ISSUES}개여야 해요)")
+    if not MIN_ISSUES <= len(issues) <= N_ISSUES:
+        errors.append(f"이슈: {len(issues)}개 ({MIN_ISSUES}~{N_ISSUES}개여야 해요)")
+    elif len(issues) < N_ISSUES:
+        warns.append(f"뉴스가 {len(issues)}개예요. 확인된 뉴스가 모자란 날이면 괜찮아요. 이유를 [사실 확인 결과]에 적어요")
     for i, it in enumerate(issues, 1):
         c = f"이슈 {i}"
         length(f"{c} 제목", it.get("title", ""), LIMITS["title"])
@@ -248,6 +251,16 @@ def check_research(d, folder):
                 errors.append(f"이슈 {i} {a.get('source')}: {ad} 기사 — 오늘 카드({cd})보다 {(cd - ad).days}일 오래됐어요 ({a.get('url')})")
             elif cd and ad > cd:
                 errors.append(f"이슈 {i} {a.get('source')}: 기사 날짜 {ad}가 카드 날짜 {cd}보다 늦어요. 날짜를 확인하세요")
+        # 숫자 대조: 강조 숫자가 저장한 기사에 나오는지 (쉼표·공백 무시)
+        lines = it.get("lines", [])
+        norm = lambda t: re.sub(r"[,\s]", "", t)
+        texts = norm(" ".join(a.get("text", "") + " " + a.get("title", "") for a in mine))
+        for x in lines:
+            for y in (x if isinstance(x, list) else [x]):
+                for h in re.findall(r"\*\*(.+?)\*\*", y):
+                    nums = re.findall(r"\d+(?:\.\d+)?", norm(h))
+                    if mine and nums and not all(n in texts for n in nums):
+                        warns.append(f"이슈 {i} 숫자 '{h}'가 저장한 기사에 없어요 → 계산한 값이면 [사실 확인 결과]에 계산식, 아니면 출처를 적거나 빼요")
         # 베끼기 검사: 카드 문장마다 그 이슈 기사 본문과 비교
         lines = it.get("lines", [])
         sents = [it.get("title", "")]
