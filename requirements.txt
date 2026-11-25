@@ -2,3 +2,4 @@ pillow
 feedparser
 trafilatura
 rapidfuzz
+fonttools

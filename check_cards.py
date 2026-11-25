@@ -155,6 +155,41 @@ def check_style(d):
         errors.append("캡션: \"출처: 언론사명\" 줄이 없어요")
 
 
+HANJA_HINT = {"美": "미국", "中": "중국", "日": "일본", "北": "북한", "韓": "한국", "與": "여당", "野": "야당",
+              "尹": "윤석열", "李": "이재명", "英": "영국", "佛": "프랑스", "獨": "독일", "露": "러시아", "靑": "청와대"}
+
+
+def walk_strings(x):
+    if isinstance(x, str):
+        yield x
+    elif isinstance(x, list):
+        for y in x:
+            yield from walk_strings(y)
+    elif isinstance(x, dict):
+        for y in x.values():
+            yield from walk_strings(y)
+
+
+def check_glyphs(d):
+    """카드 글꼴(fonts/)에 없는 글자는 이미지에서 네모(□)로 나온다. 캡션은 카드에 안 들어가니 제외."""
+    try:
+        from fontTools.ttLib import TTFont
+    except ImportError:
+        warns.append("fonttools가 없어 글꼴에 없는 글자 검사를 건너뛰었어요 (pip install fonttools)")
+        return
+    import os
+    fd = os.path.join(os.path.dirname(os.path.abspath(__file__)), "fonts")
+    have = None
+    for f in ("NotoSansKR-Bold.otf", "NotoSansKR-Medium.otf", "NotoSerifKR-Bold.otf"):
+        cm = set(TTFont(os.path.join(fd, f)).getBestCmap())
+        have = cm if have is None else have & cm
+    on_card = {k: v for k, v in d.items() if k != "caption"}
+    bad = sorted({ch for t in walk_strings(on_card) for ch in t.replace("**", "") if ord(ch) not in have and not ch.isspace()})
+    for ch in bad:
+        hint = f" → \"{HANJA_HINT[ch]}\"처럼 한글로" if ch in HANJA_HINT else " → 다른 글자로 바꿔요"
+        errors.append(f"카드 글꼴에 없는 글자 '{ch}'(이미지에서 네모로 나와요){hint}")
+
+
 def check_visual(c, it):
     v = it.get("visual")
     if not v:
@@ -235,6 +270,7 @@ def main():
     d = json.load(open(sys.argv[1], encoding="utf-8"))
     check_text(d)
     check_style(d)
+    check_glyphs(d)
     if len(sys.argv) > 2:
         check_research(d, sys.argv[2])
     for e in errors:
