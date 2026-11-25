@@ -15,6 +15,12 @@ COPY_LIMIT = 85      # 기사 문장과 이 점수(0~100) 이상 비슷하면 �
 MAX_AGE_DAYS = 2     # 카드 날짜보다 이만큼 넘게 오래된 기사는 오래된 기사로 본다
 N_ISSUES = 5         # 매일 뉴스 개수
 
+# AI 말투 (CLAUDE.md 'AI 말투 빼기', backnotprop/pstack unslop 스킬(MIT)의 한국어판)
+AI_PHRASES = ["주목할 만", "눈길을 끈", "관심이 쏠", "기대를 모", "시사하는 바", "의미가 크", "중요한 역할",
+              "결론적으로", "새로운 국면", "파장이 예상", "귀추가 주목", "논란이 됐다", "논란이 되고",
+              "앞으로가 기대", "지켜볼 필요", "뿐만 아니라", "에 따르면 관계자"]
+HEDGES = ["예정", "알려져", "전망", "보인다", "가능성", "것으로 보"]
+
 errors, warns = [], []
 
 
@@ -101,6 +107,51 @@ def check_text(d):
             errors.append(f"{c} 출처: 언론사가 {len(src)}곳 (2곳 이상)")
 
 
+def ai_style(where, text):
+    for ph in AI_PHRASES:
+        if ph in text:
+            errors.append(f"{where}: AI 말투 \"{ph}\" → 실제 사실·숫자·일정으로 바꿔 써요")
+    if re.search("[—–]", text):
+        errors.append(f"{where}: 줄표(—)는 쓰지 않아요. 쉼표나 마침표로")
+    if re.search("[\U0001F300-\U0001FAFF\u2600-\u27BF]", text):
+        errors.append(f"{where}: 장식 이모지는 쓰지 않아요")
+    if re.search("[“”‘’]", text):
+        warns.append(f"{where}: 둥근 따옴표 대신 곧은 따옴표(' \")를 써요")
+
+
+def sentences(it):
+    out = [("제목", it.get("title", ""))]
+    lines = it.get("lines", [])
+    names = ["무슨 일", "왜 중요한가", "앞으로"]
+    for k, x in enumerate(lines[:3]):
+        for y in (x if isinstance(x, list) else [x]):
+            out.append((names[k], y))
+    return out
+
+
+def check_style(d):
+    ai_style("마무리 한 줄", d.get("outro_line", ""))
+    for i, it in enumerate(d.get("issues", []), 1):
+        for name, s in sentences(it):
+            ai_style(f"이슈 {i} {name}", s)
+            if sum(s.count(h) for h in HEDGES) >= 2:
+                errors.append(f"이슈 {i} {name}: 얼버무림 표현이 두 번 겹쳐요 → \"{s}\"")
+    cap = d.get("caption")
+    if cap is None:
+        warns.append("캡션(caption)이 cards.json에 없어요. 넣으면 캡션도 검사해요")
+        return
+    ai_style("캡션", cap)
+    if "**" in cap:
+        errors.append("캡션: 별표(**)를 쓰지 않아요")
+    tags = re.findall(r"#\S+", cap)
+    if not 8 <= len(tags) <= 15:
+        errors.append(f"캡션: 해시태그 {len(tags)}개 (10개 안팎, 8~15개)")
+    if "AI가 요약하고 사람이 확인했습니다" not in cap:
+        errors.append("캡션: \"※ AI가 요약하고 사람이 확인했습니다\" 문구가 없어요")
+    if "출처:" not in cap:
+        errors.append("캡션: \"출처: 언론사명\" 줄이 없어요")
+
+
 def check_visual(c, it):
     v = it.get("visual")
     if not v:
@@ -180,6 +231,7 @@ def main():
         sys.exit(2)
     d = json.load(open(sys.argv[1], encoding="utf-8"))
     check_text(d)
+    check_style(d)
     if len(sys.argv) > 2:
         check_research(d, sys.argv[2])
     for e in errors:
