@@ -6,7 +6,8 @@
      → 언론사 여러 곳이 함께 다룬 주제(묶음)가 위에 나온다. 교차 보도 후보 찾기용.
   2) 기사 하나를 내려받아 본문·작성 날짜 저장 (trafilatura)
        python3 fetch_news.py article 기사주소 --issue 1 --source 연합뉴스 --dir out/날짜/research
-  3) 직접 읽은 기사 저장 (네트워크가 막혀 2)가 안 될 때. 본문은 표준입력으로)
+  3) 직접 읽은 기사 저장 (네트워크가 막혀 2)가 안 될 때. 본문은 표준입력으로.
+     WebFetch도 막히면 웹 검색 결과에 나온 그 기사 내용·인용문을 넣는다)
        python3 fetch_news.py save --issue 1 --source KBS --url 기사주소 --date 2026-11-25 --title "제목" --dir out/날짜/research < 본문.txt
 
 저장된 기사(research 폴더)는 check_cards.py가 교차 보도·날짜·베끼기 검사에 쓴다.
@@ -104,8 +105,8 @@ def cmd_article(a):
 
 def cmd_save(a):
     text = sys.stdin.read().strip()
-    if len(text) < 100:
-        print("본문이 너무 짧아요. 기사 본문 전체를 넣어 주세요.")
+    if len(text) < 30:
+        print("내용이 너무 짧아요. 기사 본문(또는 웹 검색 결과에 나온 그 기사 내용)을 넣어 주세요.")
         sys.exit(2)
     _save(a, text, a.date, a.title)
 
