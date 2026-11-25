@@ -5,6 +5,9 @@
 |---|---|
 | `CLAUDE.md` | Claude Code가 읽는 작업 설명서예요. 뉴스 고르는 기준, 사실 확인 방법, 카드 문구 규칙이 다 들어 있어요 |
 | `make_cards.py` | 문구를 카드 이미지로 바꿔 주는 프로그램이에요 |
+| `fetch_news.py` | 최근 24시간 뉴스 목록(RSS)을 모으고, 읽은 기사를 저장해요 |
+| `check_cards.py` | 이미지 만들기 전에 글자 수·강조 숫자·출처·교차 보도·기사 날짜·베끼기를 자동 검사해요 |
+| `requirements.txt` | 필요한 파이썬 도구 목록이에요(Pillow, feedparser, trafilatura, RapidFuzz) |
 | `fonts/` | 카드에 쓰는 한글 글꼴(Noto, 무료 글꼴)이에요 |
 | `examples/` | 예시 문구(`cards_example.json`)와 예시 카드 이미지예요 |
 

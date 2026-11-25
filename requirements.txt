@@ -1,0 +1,4 @@
+pillow
+feedparser
+trafilatura
+rapidfuzz
