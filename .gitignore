@@ -1,0 +1,4 @@
+/out/
+cards.json
+__pycache__/
+*.zip
