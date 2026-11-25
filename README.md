@@ -21,3 +21,4 @@
 ## 참고
 - 인스타그램에는 직접 "올려"라고 하기 전까지 아무것도 올리지 않도록 적어 두었어요.
 - 매일 아침 7시 13분 예약 작업은 이 GitHub 저장소(donghyeonim/onul_ns_project)를 내려받아 `CLAUDE.md`대로 카드를 만들어요. 그래서 여기서 `CLAUDE.md`나 `make_cards.py`를 고쳐 GitHub에 올리면 다음 날 아침부터 바로 반영돼요.
+- 예약 작업 결과는 보관함 페이지 https://claude.ai/artifact/85ib9KNyPjXsJDMNxrU7NL 에서 날짜별로 볼 수 있어요(비공개, 본인만 열림). 페이지 코드는 `archive/archive.html`이에요.
