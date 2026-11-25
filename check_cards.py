@@ -94,9 +94,46 @@ def check_text(d):
         for bad in ("귀추가 주목", "논란이 됐다", "논란이 되고"):
             if bad in json.dumps(it, ensure_ascii=False):
                 errors.append(f"{c}: 쓰지 말라고 한 표현 \"{bad}\"")
+        check_visual(c, it)
         src = [s for s in re.split(r"\s*[·,]\s*", it.get("source", "")) if s]
         if len(src) < 2:
             errors.append(f"{c} 출처: 언론사가 {len(src)}곳 (2곳 이상)")
+
+
+def check_visual(c, it):
+    v = it.get("visual")
+    if not v:
+        errors.append(f"{c}: 그래픽(visual)이 없어요. line·bars·timeline·versus 중 하나를 넣어요")
+        return
+    t = v.get("type")
+    if t not in ("line", "bars", "timeline", "versus"):
+        errors.append(f"{c} 그래픽: type은 line·bars·timeline·versus 중 하나 (지금: {t})")
+        return
+    if v.get("big"):
+        length(f"{c} 그래픽 큰 글자", v["big"], 8)
+    for k, x in enumerate(v.get("big_side", []), 1):
+        length(f"{c} 그래픽 옆 글자 {k}", x, 14)
+    if t == "line" and len(v.get("points", [])) < 2:
+        errors.append(f"{c} 그래픽(line): points가 2개 이상 필요해요")
+    if t == "bars" and not 2 <= len(v.get("bars", [])) <= 6:
+        errors.append(f"{c} 그래픽(bars): 막대는 2~6개")
+    if t == "timeline":
+        st = v.get("steps", [])
+        if not 2 <= len(st) <= 5:
+            errors.append(f"{c} 그래픽(timeline): 단계는 2~5개")
+        for date_, txt in st:
+            length(f"{c} 그래픽 일정 설명", txt, 8)
+    if t == "versus":
+        L, R = v.get("left") or {}, v.get("right") or {}
+        if not (L.get("name") and R.get("name")):
+            errors.append(f"{c} 그래픽(versus): 양쪽 이름(name)이 필요해요")
+        if len(L.get("points", [])) != len(R.get("points", [])):
+            errors.append(f"{c} 그래픽(versus): 양쪽 입장 개수가 달라요. 중립을 위해 똑같이 맞춰요")
+        for side in (L, R):
+            for x in side.get("points", []):
+                length(f"{c} 그래픽 입장 문장", x, 16)
+    if "정치" in it.get("tag", "") and t != "versus":
+        warns.append(f"{c}: 정치 이슈는 양측 입장(versus) 그래픽을 우선 고려해요")
 
 
 def check_research(d, folder):

@@ -1,9 +1,13 @@
 """@onul_ns 카드뉴스 이미지 생성기 (밝은 격식체 디자인)
+이슈에 "visual"이 있으면 위쪽 절반 그래픽 + 아래쪽 절반 글 카드(visuals.py), 없으면 상자형 카드.
 사용법: python3 make_cards.py cards.json 출력폴더
 → 1080x1350 JPEG(표지 + 이슈 카드 + 마무리)와 휴대폰 크기 미리보기(preview_phone.jpg)
 """
 import json, sys, os, random
 from PIL import Image, ImageDraw, ImageFont
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import visuals  # noqa: E402
 
 W, H = 1080, 1350
 PAPER = (248, 246, 241)
@@ -248,6 +252,68 @@ def issue(d, it, idx, n_issues, total):
     return im
 
 
+PANEL = (80, 196, W - 80, 736)  # 그래픽 카드의 위쪽 절반
+
+
+def issue_visual(d, it, idx, n_issues, total, progress=1.0):
+    """그래픽 카드: 위쪽 절반 그래픽(visuals.py) + 아래쪽 절반 작은 글씨"""
+    im, dr = page(plain=True)
+    masthead(dr, d, f"{idx:02d} / {n_issues:02d}")
+    x0, y0, x1, y1 = PANEL
+    try:
+        im.paste(visuals.draw_panel(it["visual"], x1 - x0, y1 - y0, progress), (x0, y0))
+    except visuals.VisualError as e:
+        raise TooLong(f"이슈 {idx} 그래픽: {e}")
+    labels = ["무슨 일", "왜 중요한가", "앞으로"]
+    sections = [b if isinstance(b, list) else [b] for b in it["lines"]]
+    tx = 250
+    maxw = W - 80 - tx
+    for ts, bs in [(50, 29), (47, 28), (44, 27), (42, 26)]:
+        ftitle, fb, fe = font(SERIF_B, ts), font(SANS_M, bs), font(SANS_B, bs)
+        tl = wrap(dr, it["title"], ftitle, W - 160)
+        lh = int(bs * 1.5)
+        wrapped = [[wrap_rich(dr, t, fb, fe, maxw - (18 if len(items) > 1 else 0)) for t in items]
+                   for items in sections]
+        h = y1 + 30 + 44 + 22 + len(tl) * int(ts * 1.25) + 18
+        h += sum(sum(len(w) for w in ws) * lh + 30 for ws in wrapped)
+        if h <= H - 150 and len(tl) <= 2:
+            break
+    else:
+        raise TooLong(f"이슈 {idx} 카드 글이 너무 깁니다. 제목이나 문장을 줄이세요.")
+    y = y1 + 30
+    ft = font(SANS_B, 26)
+    tw = dr.textlength(it["tag"], font=ft)
+    dr.rectangle((80, y, 80 + tw + 32, y + 44), outline=BLUE, width=3)
+    dr.text((96, y + 4), it["tag"], font=ft, fill=BLUE)
+    y += 44 + 22
+    y = draw_lines(dr, (80, y), it["title"], ftitle, INK, W - 160, 1.25) + 18
+    fl = font(SANS_B, 26)
+    for k, (label, ws) in enumerate(zip(labels, wrapped)):
+        dr.line((80, y - 12, W - 80, y - 12), fill=LINE, width=1)
+        dr.text((80, y + 2), label, font=fl, fill=GOLD if k == 1 else BLUE)
+        yy = y
+        for w in ws:
+            for li, line in enumerate(w):
+                x = tx
+                if len(ws) > 1:
+                    if li == 0:
+                        dr.text((tx, yy), "·", font=fe, fill=GOLD)
+                    x = tx + 18
+                draw_rich_line(dr, x, yy, line, fb, fe, INK, BLUE)
+                yy += lh
+        y = yy + 30
+    src = it.get("source")
+    footer(dr, d.get("handle"), f"출처: {src}" if src else "")
+    return im
+
+
+def issue_card(d, it, idx, n_issues, total):
+    """visual이 있으면 그래픽 카드, 없으면 예전 상자형 카드"""
+    if it.get("visual"):
+        return issue_visual(d, it, idx, n_issues, total)
+    return issue(d, it, idx, n_issues, total)
+
+
 def outro(d, total):
     im, dr = page()
     masthead(dr, d, d["date"])
@@ -270,7 +336,7 @@ def main(src, out):
     os.makedirs(out, exist_ok=True)
     n = len(d["issues"])
     total = n + 2
-    pages = [cover(d, total)] + [issue(d, it, i, n, total) for i, it in enumerate(d["issues"], 1)] + [outro(d, total)]
+    pages = [cover(d, total)] + [issue_card(d, it, i, n, total) for i, it in enumerate(d["issues"], 1)] + [outro(d, total)]
     for i, p in enumerate(pages, 1):
         path = os.path.join(out, f"card_{i:02d}.jpg")
         p.save(path, "JPEG", quality=92)
