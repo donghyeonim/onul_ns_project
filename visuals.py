@@ -220,24 +220,31 @@ def draw_versus(p, v, w, h, y0, t):
     xs = [80, 80 + colw + 60]
     p.ctext(w / 2, y0 + 70, "VS", F(SERIF_B, 34), LABEL)
     p.line(w / 2, y0 + 120, w / 2, h - 50, LINE, 2)
+    # 나타나는 순서: 왼쪽 이름 → 오른쪽 이름 → 왼쪽 입장1 → 오른쪽 입장1 → … (양쪽을 번갈아 똑같이)
+    npts = max(len(s["points"][:3]) for s in sides)
+    slots = 2 + 2 * npts
+    def shown(k):
+        return ease((t * slots - k) * 1.4)
     for k, (s, x) in enumerate(zip(sides, xs)):
-        a = ease(t * 1.6 - k * 0.45)  # 왼쪽 먼저, 오른쪽 나중(양쪽 같은 모양·같은 색)
+        a = shown(k)
         if a <= 0:
             continue
-        dy = (1 - a) * 30
-        y = y0 + 40 + dy
+        y = y0 + 40 + (1 - a) * 24
         p.text(x, y, s["name"], F(SANS_B, 34), INK)
-        p.line(x, y + 54, x + colw, y + 54, INK, 3)
-        y += 76
-        for pt in s["points"][:3]:
+        p.line(x, y + 54, x + (colw * a), y + 54, INK, 3)
+    for k, (s, x) in enumerate(zip(sides, xs)):
+        y = y0 + 116
+        for j, pt in enumerate(s["points"][:3]):
             lines = p.wrap(pt, F(SANS_M, 27), colw - 26)
-            p.text(x, y, "·", F(SANS_B, 27), GOLD)
-            for ln in lines:
-                p.text(x + 22, y, ln, F(SANS_M, 27), INK)
-                y += 40
-            y += 14
-        if y > h - 16:
-            raise VisualError("versus: 입장 문장이 너무 길어요. 줄이세요")
+            a = shown(2 + j * 2 + k)
+            if a > 0:
+                yy = y + (1 - a) * 24
+                p.text(x, yy, "·", F(SANS_B, 27), GOLD)
+                for li, ln in enumerate(lines):
+                    p.text(x + 22, yy + li * 40, ln, F(SANS_M, 27), INK)
+            y += len(lines) * 40 + 14
+            if y > h - 16:
+                raise VisualError("versus: 입장 문장이 너무 길어요. 줄이세요")
 
 
 def draw_panel(v, w, h, progress=1.0):
