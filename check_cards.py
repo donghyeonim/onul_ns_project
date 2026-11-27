@@ -2,7 +2,8 @@
 
 사용법
   python3 check_cards.py cards.json                       # 글자 수·강조 숫자·출처 검사
-  python3 check_cards.py cards.json out/날짜/research      # + 교차 보도·기사 날짜·베끼기 검사
+  python3 check_cards.py cards.json out/날짜/research      # + 교차 보도·기사 날짜·베끼기·그래픽 숫자 검사
+                                                          #   + 최근 보관함(archive/)과 비슷한 뉴스 검사
 
 [오류]가 하나라도 있으면 실패(종료 코드 1). 문구를 고쳐서 다시 돌린다.
 [주의]는 실패는 아니지만 다시 한번 보라는 뜻이다.
@@ -12,7 +13,9 @@ from datetime import date, datetime
 
 LIMITS = {"title": 20, "what": 24, "why": 36, "next": 24, "keyword": 16, "outro": 28}
 COPY_LIMIT = 85      # 기사 문장과 이 점수(0~100) 이상 비슷하면 베낀 것으로 본다
-MAX_AGE_DAYS = 2     # 카드 날짜보다 이만큼 넘게 오래된 기사는 오래된 기사로 본다
+MAX_AGE_DAYS = 1     # 기준: 최근 24시간. 카드 날짜보다 1일 넘게 오래된 기사(그제 이전)는 오류
+REPEAT_DAYS = 2      # 최근 이 날짜 수만큼의 보관함과 비교해 비슷한 뉴스를 잡는다
+GENERIC_OUTRO = ["내일 아침에도", "내일 또 만나", "다음에 또", "핵심 뉴스로 만나"]
 N_ISSUES = 5         # 매일 뉴스 개수 (확인된 뉴스가 모자라면 MIN_ISSUES까지 줄여도 됨)
 MIN_ISSUES = 3
 
@@ -137,6 +140,8 @@ def sentences(it):
 
 def check_style(d):
     ai_style("마무리 한 줄", d.get("outro_line", ""))
+    if any(g in d.get("outro_line", "") for g in GENERIC_OUTRO):
+        warns.append("마무리 한 줄이 매일 같은 인사말이에요 → 그날 뉴스를 한 줄로 묶어 써요 (예: \"금리는 오르고, 세금 고지서도 늘었어요\")")
     for i, it in enumerate(d.get("issues", []), 1):
         for name, s in sentences(it):
             ai_style(f"이슈 {i} {name}", s)
@@ -229,6 +234,68 @@ def check_visual(c, it):
         warns.append(f"{c}: 정치 이슈는 양측 입장(versus) 그래픽을 우선 고려해요")
 
 
+def fmt_num(v):
+    """그래프 값 → 기사에서 찾을 글자 (54.0 → '54', 4.96 → '4.96')"""
+    if isinstance(v, bool) or not isinstance(v, (int, float)):
+        return None
+    return str(int(v)) if float(v).is_integer() else f"{v:g}"
+
+
+def visual_numbers(v):
+    found = []
+    for key in ("bars", "points"):
+        for row in v.get(key, []) or []:
+            if isinstance(row, (list, tuple)) and len(row) >= 2:
+                found.append(fmt_num(row[1]))
+    ref = v.get("ref")
+    if isinstance(ref, (list, tuple)) and len(ref) >= 2:
+        found.append(fmt_num(ref[1]))
+    for t in [v.get("big", "")] + list(v.get("big_side", []) or []):
+        t = re.sub(r"[,\s]", "", str(t))
+        if re.fullmatch(r"D-\d+", t):  # D-day는 날짜 계산값이라 제외
+            continue
+        found += re.findall(r"\d+(?:\.\d+)?", t)
+    return [x for x in dict.fromkeys(found) if x]
+
+
+def recent_titles(d, days=REPEAT_DAYS):
+    """archive/날짜/README.md 의 '1. **제목**' 줄에서 최근 며칠 카드 제목을 읽는다."""
+    import os
+    from datetime import timedelta
+    cd = card_date(d)
+    if not cd:
+        return []
+    root = os.path.join(os.path.dirname(os.path.abspath(__file__)), "archive")
+    out = []
+    for k in range(1, days + 1):
+        day = (cd - timedelta(days=k)).isoformat()
+        p = os.path.join(root, day, "README.md")
+        if os.path.exists(p):
+            for m in re.finditer(r"^\d+\. \*\*(.+?)\*\*", open(p, encoding="utf-8").read(), re.M):
+                out.append((day, m[1]))
+    return out
+
+
+STOP = {"오늘", "내일", "어제", "올해", "내년", "정부", "한국", "미국", "발표", "인상", "인하", "증가", "감소", "최고", "최저", "유지", "확정", "논란"}
+
+
+def words(t):
+    return {w for w in re.findall(r"[가-힣A-Za-z]{2,}", t) if w not in STOP}
+
+
+def check_repeat(d):
+    """최근 보관함과 같은 주제면 [주의]. 큰 변화(결정·확정, 숫자가 크게 바뀜, 새 단계)일 때만 다시 쓴다."""
+    from rapidfuzz import fuzz
+    prev = recent_titles(d)
+    for i, it in enumerate(d.get("issues", []), 1):
+        t = it.get("title", "")
+        for day, pt in prev:
+            shared = {w for w in words(t) & words(pt) if len(w) >= 3}
+            if shared or fuzz.token_set_ratio(t, pt) >= 60:
+                warns.append(f"이슈 {i} '{t}'가 {day} 카드 '{pt}'와 비슷해요 → 큰 변화(결정·확정, 숫자가 크게 바뀜, 새 단계)가 아니면 빼고, 넣으면 이유를 [사실 확인 결과]에 적어요")
+                break
+
+
 def check_research(d, folder):
     from rapidfuzz import fuzz
     arts = []
@@ -261,6 +328,11 @@ def check_research(d, folder):
                     nums = re.findall(r"\d+(?:\.\d+)?", norm(h))
                     if mine and nums and not all(n in texts for n in nums):
                         warns.append(f"이슈 {i} 숫자 '{h}'가 저장한 기사에 없어요 → 계산한 값이면 [사실 확인 결과]에 계산식, 아니면 출처를 적거나 빼요")
+        # 그래픽 숫자 대조: 막대·선·기준선 값과 큰 글자 속 숫자가 저장한 기사에 나오는지
+        if mine:
+            for h in visual_numbers(it.get("visual") or {}):
+                if h not in texts:
+                    warns.append(f"이슈 {i} 그래픽 숫자 '{h}'가 저장한 기사에 없어요 → 계산한 값이면 [사실 확인 결과]에 계산식을 적고, 아니면 빼요")
         # 베끼기 검사: 카드 문장마다 그 이슈 기사 본문과 비교
         lines = it.get("lines", [])
         sents = [it.get("title", "")]
@@ -286,6 +358,7 @@ def main():
     check_glyphs(d)
     if len(sys.argv) > 2:
         check_research(d, sys.argv[2])
+        check_repeat(d)
     for e in errors:
         print("[오류]", e)
     for w in warns:
