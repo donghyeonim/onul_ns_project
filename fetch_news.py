@@ -90,8 +90,15 @@ def _save(a, text, date, title):
 
 
 def cmd_article(a):
-    import trafilatura
-    html = trafilatura.fetch_url(a.url)
+    import trafilatura, urllib.request
+    html = None
+    try:
+        # urllib honors HTTPS_PROXY (needed in cloud sessions); trafilatura's own fetcher does not
+        req = urllib.request.Request(a.url, headers={"User-Agent": "Mozilla/5.0 (news-card-bot)"})
+        raw = urllib.request.urlopen(req, timeout=20).read()
+        html = raw.decode("utf-8", errors="replace")
+    except Exception:
+        html = trafilatura.fetch_url(a.url)
     if not html:
         print("기사를 내려받지 못했어요(접속 막힘 등). WebFetch로 읽고 'save'로 저장하세요.")
         sys.exit(2)
