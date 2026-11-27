@@ -15,6 +15,7 @@ LIMITS = {"title": 20, "what": 24, "why": 36, "next": 24, "keyword": 16, "outro"
 COPY_LIMIT = 85      # 기사 문장과 이 점수(0~100) 이상 비슷하면 베낀 것으로 본다
 MAX_AGE_DAYS = 1     # 기준: 최근 24시간. 카드 날짜보다 1일 넘게 오래된 기사(그제 이전)는 오류
 REPEAT_DAYS = 2      # 최근 이 날짜 수만큼의 보관함과 비교해 비슷한 뉴스를 잡는다
+TAGS = ["#정치", "#경제", "#사회", "#생활/문화", "#IT/과학", "#세계"]  # 네이버 뉴스 분야와 같게
 GENERIC_OUTRO = ["내일 아침에도", "내일 또 만나", "다음에 또", "핵심 뉴스로 만나"]
 N_ISSUES = 5         # 매일 뉴스 개수 (확인된 뉴스가 모자라면 MIN_ISSUES까지 줄여도 됨)
 MIN_ISSUES = 3
@@ -81,6 +82,13 @@ def check_text(d):
         errors.append(f"이슈: {len(issues)}개 ({MIN_ISSUES}~{N_ISSUES}개여야 해요)")
     elif len(issues) < N_ISSUES:
         warns.append(f"뉴스가 {len(issues)}개예요. 확인된 뉴스가 모자란 날이면 괜찮아요. 이유를 [사실 확인 결과]에 적어요")
+    from collections import Counter
+    cnt = Counter(it.get("tag") for it in issues)
+    for t, k in cnt.items():
+        if k >= 3:
+            errors.append(f"분야 {t}가 {k}개예요 (같은 분야는 2개까지)")
+        elif k == 2:
+            warns.append(f"분야 {t}가 2개예요. 기본은 서로 다른 분야 5개. 다른 분야에 확인된 뉴스가 없을 때만 괜찮아요")
     for i, it in enumerate(issues, 1):
         c = f"이슈 {i}"
         length(f"{c} 제목", it.get("title", ""), LIMITS["title"])
@@ -107,6 +115,8 @@ def check_text(d):
         for bad in ("귀추가 주목", "논란이 됐다", "논란이 되고"):
             if bad in json.dumps(it, ensure_ascii=False):
                 errors.append(f"{c}: 쓰지 말라고 한 표현 \"{bad}\"")
+        if it.get("tag") not in TAGS:
+            errors.append(f"{c} 분야 태그: \"{it.get('tag')}\" → {' '.join(TAGS)} 중 하나로 써요")
         check_visual(c, it)
         src = [s for s in re.split(r"\s*[·,]\s*", it.get("source", "")) if s]
         if len(src) < 2:
