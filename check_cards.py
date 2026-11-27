@@ -17,7 +17,8 @@ MAX_AGE_DAYS = 1     # 기준: 최근 24시간. 카드 날짜보다 1일 넘게 
 REPEAT_DAYS = 2      # 최근 이 날짜 수만큼의 보관함과 비교해 비슷한 뉴스를 잡는다
 TAGS = ["#정치", "#경제", "#사회", "#생활/문화", "#IT/과학", "#세계"]  # 네이버 뉴스 분야와 같게
 GENERIC_OUTRO = ["내일 아침에도", "내일 또 만나", "다음에 또", "핵심 뉴스로 만나"]
-N_ISSUES = 5         # 매일 뉴스 개수 (확인된 뉴스가 모자라면 MIN_ISSUES까지 줄여도 됨)
+N_ISSUES = 7         # 매일 뉴스 개수 최대 (목표 GOAL_ISSUES~N_ISSUES, 확인된 뉴스가 모자라면 MIN_ISSUES까지)
+GOAL_ISSUES = 6
 MIN_ISSUES = 3
 
 # AI 말투 (CLAUDE.md 'AI 말투 빼기', backnotprop/pstack unslop 스킬(MIT)의 한국어판)
@@ -80,15 +81,20 @@ def check_text(d):
     issues = d.get("issues", [])
     if not MIN_ISSUES <= len(issues) <= N_ISSUES:
         errors.append(f"이슈: {len(issues)}개 ({MIN_ISSUES}~{N_ISSUES}개여야 해요)")
-    elif len(issues) < N_ISSUES:
+    elif len(issues) < GOAL_ISSUES:
         warns.append(f"뉴스가 {len(issues)}개예요. 확인된 뉴스가 모자란 날이면 괜찮아요. 이유를 [사실 확인 결과]에 적어요")
     from collections import Counter
     cnt = Counter(it.get("tag") for it in issues)
+    missing = [t for t in TAGS if t not in cnt]
+    if len(issues) >= GOAL_ISSUES and missing:
+        warns.append(f"빠진 분야: {' '.join(missing)}. 6개 분야를 모두 넣는 게 기본이에요. 확인된 뉴스가 없으면 [사실 확인 결과]에 적어요")
+    if sum(1 for k in cnt.values() if k == 2) > 1:
+        errors.append("2개씩 들어간 분야가 둘 이상이에요. 같은 분야 2개는 한 분야까지만")
     for t, k in cnt.items():
         if k >= 3:
             errors.append(f"분야 {t}가 {k}개예요 (같은 분야는 2개까지)")
         elif k == 2:
-            warns.append(f"분야 {t}가 2개예요. 기본은 서로 다른 분야 5개. 다른 분야에 확인된 뉴스가 없을 때만 괜찮아요")
+            warns.append(f"분야 {t}가 2개예요. 그날 가장 큰 분야인지 확인해요")
     for i, it in enumerate(issues, 1):
         c = f"이슈 {i}"
         length(f"{c} 제목", it.get("title", ""), LIMITS["title"])

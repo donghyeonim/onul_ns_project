@@ -129,10 +129,15 @@ def cover(d, total):
     dr.text((80, 220), "TODAY'S BRIEFING", font=font(SANS_B, 30), fill=GOLD)
     dr.text((80, 262), "오늘의", font=font(SERIF_B, 104), fill=INK)
     dr.text((80, 386), f"핵심 뉴스 {len(d['keywords'])}", font=font(SERIF_B, 104), fill=BLUE)
-    y = 580
     few = len(d["keywords"]) <= 3
-    fk, fn = (font(SANS_M, 48), font(SERIF_B, 48)) if few else (font(SANS_M, 43), font(SERIF_B, 43))
-    step = 100 if few else 76
+    many = len(d["keywords"]) > 5  # 6~7 keywords: tighter rows so the list stays above the skyline
+    y = 540 if many else 580
+    if few:
+        fk, fn, step = font(SANS_M, 48), font(SERIF_B, 48), 100
+    elif many:
+        fk, fn, step = font(SANS_M, 37), font(SERIF_B, 37), 62
+    else:
+        fk, fn, step = font(SANS_M, 43), font(SERIF_B, 43), 76
     for i, kw in enumerate(d["keywords"], 1):
         kl = wrap(dr, kw, fk, W - 260)
         if len(kl) > 1:
@@ -140,7 +145,7 @@ def cover(d, total):
         dr.text((80, y), f"{i:02d}", font=fn, fill=GOLD)
         dr.text((170, y), kl[0], font=fk, fill=INK)
         y += step
-        ly = y - (22 if few else 10)
+        ly = y - (22 if few else 2 if many else 10)
         dr.line((80, ly, W - 80, ly), fill=LINE, width=2)
     footer(dr, d.get("handle"))
     return im
